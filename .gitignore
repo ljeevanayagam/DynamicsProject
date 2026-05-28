@@ -1,0 +1,8 @@
+# Business Central AL build artifacts
+.alpackages/
+*.app
+
+# VS Code / AL tooling noise
+.alcache/
+.rad.json
+.output/
