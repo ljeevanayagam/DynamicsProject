@@ -1,0 +1,32 @@
+{
+    "id": "60094b70-c1ee-4cee-83f1-3afa10d27a40",
+    "name": "DynamicsProject",
+    "publisher": "BioCure Solutions LLC",
+    "version": "2.6.5.1",
+    "brief": "",
+    "description": "",
+    "privacyStatement": "",
+    "EULA": "",
+    "help": "",
+    "url": "https://businesscentral.dynamics.com/60094b70-c1ee-4cee-83f1-3afa10d27a40/Workflow",
+    "logo": "",
+    "dependencies": [],
+    "screenshots": [],
+    "platform": "28.0.0.0",
+    "application": "28.0.0.0",
+    "idRanges": [
+        {
+            "from": 50100,
+            "to": 99999
+        }
+    ],
+    "resourceExposurePolicy": {
+        "allowDebugging": true,
+        "allowDownloadingSource": true,
+        "includeSourceInSymbolFile": true
+    },
+    "runtime": "16.0",
+    "features": [
+        "NoImplicitWith"
+    ]
+}

@@ -1,0 +1,36 @@
+page 60004 "Operational Supplies Subpage"
+{
+    PageType = ListPart;
+    SourceTable = "Work Order Supply Line";
+    ApplicationArea = All;
+
+    layout
+    {
+        area(Content)
+        {
+            repeater(Group)
+            {
+                field("No."; Rec."Line No.") { Editable = false; }
+                field("Item No."; Rec."Item No.")
+                {
+                    Editable = false;
+                    TableRelation = Item;
+                }
+                field("Item Description"; Rec."Item Description") { Editable = false; }
+                field("Part No."; Rec."Part No.") { }
+                field("Lot No."; Rec."Lot No.") { }
+                field(Verification; Rec.Verification) { }
+                field("Unit Quantity"; Rec."Unit Quantity")
+                {
+                    Editable = false;
+                }
+                field("Unit of Measure"; Rec."Unit of Measure")
+                {
+                    Editable = false;
+                }
+                field("Performed By"; Rec."Performed By") { }
+                field(Date; Rec.Date) { }
+            }
+        }
+    }
+}

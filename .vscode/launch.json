@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "environmentType": "Sandbox",
+    "sandboxName": "Workflow",
+    "server": "https://businesscentral.dynamics.com/60094b70-c1ee-4cee-83f1-3afa10d27a40/Workflow",
+    "serverInstance": "BC",
+    "startupObjectId": 22,
+    "startupObjectType": "Page",
+    "configurations": [
+        {
+            "name": "Microsoft cloud sandbox",
+            "request": "launch",
+            "type": "al",
+            "environmentType": "Sandbox",
+            "environmentName": "Workflow",
+            "startupObjectId": 22,
+            "startupObjectType": "Page",
+            "breakOnError": "All",
+            "launchBrowser": true,
+            "enableLongRunningSqlStatements": true,
+            "enableSqlInformationDebugger": true,
+            "schemaUpdateMode":"Synchronize"
+        }
+    ]
+}
