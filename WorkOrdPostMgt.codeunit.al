@@ -13,8 +13,14 @@ codeunit 60001 "Work Order Posting Mgt"
         VendorRec: Record Vendor;
         OutputBin: Code[20];
     begin
-        if (WorkOrder."Routing No." = 'PRINTLABEL') then
+        if (WorkOrder."Routing No." = 'PRINTLABEL') then begin
+            WorkOrder."Print Label Status" :=
+                WorkOrder."Print Label Status"::Completed;
+
+            WorkOrder."Submitted" := true;
+            WorkOrder.Modify(true);
             exit;
+        end;
         // 🔒 Basic validations
         if WorkOrder."No." = '' then
             Error('Work Order No. is required.');

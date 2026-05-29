@@ -1,40 +1,75 @@
 codeunit 60112 "Work Order Orchestrator"
 {
     procedure HandleRoutingChange(var WO: Record "Work Order Header")
-    var
-        SupplyMgt: Codeunit "Operational Supply Mgt";
-        EquipMgt: Codeunit "Equipment Line Mgt";
-        ProdRelMgt: Codeunit "Product Release Mgt";
-        BOMMgt: Codeunit "Work Order BOM Mgt";
-        BCert: Codeunit "Belzer Certificate Mgt";
-        PCert: Codeunit "PT Certification Mgt";
-        PTPack: Codeunit "PT Packing List Mgt";
-        LabelMgt: Codeunit "Work Order Label Mgt";
-        CTMat: Codeunit "Cure Time Materials Mgt";
-        CTEquip: Codeunit "Cure Time Equipment Mgt";
     begin
         if WO."No." = '' then
             exit;
-        // =====================================================
-        // 1. RESOLVE ROUTING + FLAGS
-        // =====================================================
-        ResolveRouting(WO);
-        // =====================================================
-        // 2. PT RECALCULATIONS (IN MEMORY ONLY)
-        // =====================================================
-        if IsPTWorkOrder(WO) then begin
-            WO.RecalculatePT();
-            WO.UpdateQAReleasedQty();
-            UpdatePTLotNumbers(WO);
-            CTEquip.GenerateCTEqupment(WO);
-            CTMat.GenerateCTMaterials(WO);
-        end;
-        // =====================================================
-        // 3. MATERIAL / EQUIPMENT GENERATION
-        // =====================================================
-        if IsPTWorkOrder(WO) then begin
+        if WO."Product Part Number" = '' then
+            exit;
+        if WO."PT Update In Progress" then
+            exit;
+        SetUpdateFlag(WO, true);
+        RunAllPhases(WO);
+        SetUpdateFlag(WO, false);
+        WO.Modify(true);
+        Commit();
+    end;
+
+    local procedure RunAllPhases(var WO: Record "Work Order Header")
+    begin
+        RunRoutingPhase(WO);
+        RunCalculationPhase(WO);
+        RunGenerationPhase(WO);
+        RunFinalizationPhase(WO);
+    end;
+
+    local procedure SetUpdateFlag(var WO: Record "Work Order Header"; Value: Boolean)
+    begin
+        WO."PT Update In Progress" := Value;
+    end;
+
+    local procedure RunRoutingPhase(var WO: Record "Work Order Header")
+    var
+        ItemRec: Record Item;
+    begin
+        if WO."Product Part Number" = '' then
+            exit;
+        if ItemRec.Get(WO."Product Part Number") then
+            if (ItemRec."Routing No." <> '') and
+               (WO."Routing No." <> ItemRec."Routing No.") then
+                WO.Validate("Routing No.", ItemRec."Routing No.");
+
+        ClearFlags(WO);
+    end;
+
+    local procedure RunCalculationPhase(var WO: Record "Work Order Header")
+    var
+        CTEquip: Codeunit "Cure Time Equipment Mgt";
+        CTMat: Codeunit "Cure Time Materials Mgt";
+    begin
+        if not WO.IsPTReady() then
+            exit;
+        WO.RecalculatePT();
+        WO.UpdateQAReleasedQty();
+        UpdatePTLotNumbers(WO);
+        CTEquip.GenerateCTEqupment(WO);
+        CTMat.GenerateCTMaterials(WO);
+    end;
+
+    local procedure RunGenerationPhase(var WO: Record "Work Order Header")
+    var
+        BOMMgt: Codeunit "Work Order BOM Mgt";
+        EquipMgt: Codeunit "Equipment Line Mgt";
+        SupplyMgt: Codeunit "Operational Supply Mgt";
+        ProdRelMgt: Codeunit "Product Release Mgt";
+        BCert: Codeunit "Belzer Certificate Mgt";
+        PCert: Codeunit "PT Certification Mgt";
+        PTPack: Codeunit "PT Packing List Mgt";
+    begin
+        if WO.IsPTReady() then begin
             BOMMgt.GeneratePTMaterialLines(WO);
             EquipMgt.GeneratePTEquipment(WO);
+
             PCert.GenerateTestResults(WO);
             PTPack.GeneratePTPacking(WO);
         end else begin
@@ -43,93 +78,55 @@ codeunit 60112 "Work Order Orchestrator"
                 EquipMgt.GenerateEquipment(WO);
             end;
         end;
-        // =====================================================
-        // 4. SHARED GENERATION
-        // =====================================================
+
         SupplyMgt.GenerateSupplies(WO);
         ProdRelMgt.HandleRoutingChange(WO);
         BCert.GenerateTestResults(WO);
-        // =====================================================
-        // 5. LABEL REFRESH
-        // =====================================================
-        if WO."PL Labels Locked" = false then
+    end;
+
+    local procedure RunFinalizationPhase(var WO: Record "Work Order Header")
+    var
+        LabelMgt: Codeunit "Work Order Label Mgt";
+    begin
+        if not WO."PL Labels Locked" then
             LabelMgt.GeneratePLLabels(WO);
+
+        SetRoutingFlags(WO);
     end;
 
     procedure UpdatePTLotNumbers(var WO: Record "Work Order Header")
-    var
-        Cert: Record "PT Cert of Analysis Data";
-        Pack: Record "Packing List PT Data";
-        CIndex: Integer;
-        PIndex: Integer;
     begin
-        // =====================================================
-        // HEADER VALUES ONLY
-        // =====================================================
-        if (WO."Pedga Mix Date" <> 0D) then
-            WO."PEDGA Customer Lot Number" := Format(WO."Pedga Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-PEDGA';
-        if (WO."Thiocure Mix Date" <> 0D) then
-            WO."THIOCURE Customer Lot Number" := Format(WO."Thiocure Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-TH333';
-        // =====================================================
-        // PUSH TO CERTIFICATE DATA
-        // =====================================================
-        Cert.SetRange("Work Order No.", WO."No.");
-        if Cert.FindSet() then begin
-            CIndex := 1;
-            repeat
-                if CIndex = 1 then begin
-                    Cert."Lot Number" := WO."PEDGA Customer Lot Number";
-                    Cert."Mix Date" := WO."Pedga Mix Date";
-                end else begin
-                    Cert."Lot Number" := WO."THIOCURE Customer Lot Number";
-                    Cert."Mix Date" := WO."Thiocure Mix Date";
-                end;
-                Cert.Modify(false);
-                CIndex += 1;
-            until Cert.Next() = 0;
-        end;
-        // =====================================================
-        // PUSH TO PACKING DATA
-        // =====================================================
-        Pack.SetRange("Work Order No.", WO."No.");
-        if Pack.FindSet() then begin
-            PIndex := 1;
-            repeat
-                if PIndex = 1 then
-                    Pack."Customer Lot Number" := WO."PEDGA Customer Lot Number"
-                else
-                    Pack."Customer Lot Number" := WO."THIOCURE Customer Lot Number";
-                Pack.Modify(false);
-                PIndex += 1;
-            until Pack.Next() = 0;
+        if WO."Pedga Mix Date" <> 0D then
+            WO."PEDGA Customer Lot Number" :=
+                Format(WO."Pedga Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-PEDGA';
+
+        if WO."Thiocure Mix Date" <> 0D then
+            WO."THIOCURE Customer Lot Number" :=
+                Format(WO."Thiocure Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-TH333';
+    end;
+
+    procedure GetPTLotNumberByComponent(Component: Enum "PT Component"; WO: Record "Work Order Header"): Code[50]
+    begin
+        case Component of
+            Component::PEDGA:
+                if WO."Pedga Mix Date" <> 0D then
+                    exit(Format(WO."Pedga Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-PEDGA');
+
+            Component::THIOCURE:
+                if WO."Thiocure Mix Date" <> 0D then
+                    exit(Format(WO."Thiocure Mix Date", 0, '<Year,2><Month,2><Day,2>') + '-TH333');
         end;
     end;
 
-    local procedure IsPTWorkOrder(WO: Record "Work Order Header"): Boolean
+    procedure GetPTMixDateByComponent(Component: Enum "PT Component"; WO: Record "Work Order Header"): Date
     begin
-        exit(
-            (WO."PEDGA Part Number" = 'PN-0446') and
-            (WO."Thiocure Part Number" = 'PN-0447')
-        );
-    end;
+        case Component of
+            Component::PEDGA:
+                exit(WO."Pedga Mix Date");
 
-    local procedure ResolveRouting(var WO: Record "Work Order Header")
-    var
-        ItemRec: Record Item;
-    begin
-        if WO."Product Part Number" = '' then
-            exit;
-
-        if ItemRec.Get(WO."Product Part Number") then begin
-            if (ItemRec."Routing No." <> '') and
-               (WO."Routing No." <> ItemRec."Routing No.")
-            then
-                WO.Validate("Routing No.", ItemRec."Routing No.");
+            Component::THIOCURE:
+                exit(WO."Thiocure Mix Date");
         end;
-
-        ClearFlags(WO);
-
-        SetRoutingFlags(WO);
     end;
 
     local procedure ClearFlags(var WO: Record "Work Order Header")
@@ -141,23 +138,42 @@ codeunit 60112 "Work Order Orchestrator"
         WO."Show MOON-MNLT" := false;
     end;
 
-    procedure SetRoutingFlags(var WO: Record "Work Order Header")
+    local procedure SetRoutingFlags(var WO: Record "Work Order Header")
     begin
         case WO."Routing No." of
             'BELZER':
                 WO."Show BELZER" := true;
-
             'PRINTLABEL':
                 WO."Show PRINTLABEL" := true;
-
             'SUB-OTS':
                 WO."Show SUB-OTS" := true;
-
             'FILL_SET':
                 WO."Show FILL_SET" := true;
-
             'MOON-MNLT':
                 WO."Show MOON-MNLT" := true;
         end;
+    end;
+
+    procedure RunFullPTGeneration(var WO: Record "Work Order Header")
+    begin
+        UpdatePTLotNumbers(WO);
+
+        HandleRoutingChange(WO);
+
+        WO.RefreshMaterialAndLabels();
+
+        if WO."Requires Product Release" then
+            Codeunit.Run(Codeunit::"Product Release Mgt");
+    end;
+
+    procedure ProcessPTIfRequired(var WO: Record "Work Order Header")
+    begin
+        if not WO."PT Update Required" then
+            exit;
+
+        WO."PT Update Required" := false;
+        WO.Modify(false);
+
+        RunFullPTGeneration(WO);
     end;
 }

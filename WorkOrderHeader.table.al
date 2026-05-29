@@ -194,25 +194,19 @@ table 60001 "Work Order Header"
         field(52; "Pedga Mix Date"; Date)
         {
             trigger OnValidate()
-            var
-                WO: Codeunit "Work Order Orchestrator";
             begin
-                if ("Pedga Mix Date" <> xRec."Pedga Mix Date") or
-                ("Thiocure Mix Date" <> xRec."Thiocure Mix Date") then begin
-                    WO.UpdatePTLotNumbers(Rec);
-                end;
+                if Rec."No." = '' then
+                    exit;
+                RefreshPTConfiguration();
             end;
         }
         field(53; "Thiocure Mix Date"; Date)
         {
             trigger OnValidate()
-            var
-                WO: Codeunit "Work Order Orchestrator";
             begin
-                if ("Pedga Mix Date" <> xRec."Pedga Mix Date") or
-                ("Thiocure Mix Date" <> xRec."Thiocure Mix Date") then begin
-                    WO.UpdatePTLotNumbers(Rec);
-                end;
+                if Rec."No." = '' then
+                    exit;
+                RefreshPTConfiguration();
             end;
         }
         field(54; "Moonlight Therap Contents"; Integer) { }
@@ -238,6 +232,7 @@ table 60001 "Work Order Header"
             trigger OnValidate()
             var
                 ItemRec: Record Item;
+                WOOrchestrator: Codeunit "Work Order Orchestrator";
             begin
                 if ItemRec.Get("PEDGA Part Number") then begin
                     "PEDGA Description" := ItemRec.Description;
@@ -246,6 +241,11 @@ table 60001 "Work Order Header"
                     Clear("PEDGA Description");
                     Clear("PEDGA Revision");
                 end;
+                if Rec.IsPTReady() then begin
+                    Rec.Modify(true);
+                    WOOrchestrator.HandleRoutingChange(Rec);
+                end;
+
                 "CT Materials Generated" := false;
                 "CT Equipment Generated" := false;
                 RefreshPTConfiguration();
@@ -256,6 +256,7 @@ table 60001 "Work Order Header"
             trigger OnValidate()
             var
                 ItemRec: Record Item;
+                WOOrchestrator: Codeunit "Work Order Orchestrator";
             begin
                 if ItemRec.Get("Thiocure Part Number") then begin
                     "THIOCURE Description" := ItemRec.Description;
@@ -263,6 +264,10 @@ table 60001 "Work Order Header"
                 end else begin
                     Clear("THIOCURE Description");
                     Clear("THIOCURE Revision");
+                end;
+                if Rec.IsPTReady() then begin
+                    Rec.Modify(true);
+                    WOOrchestrator.HandleRoutingChange(Rec);
                 end;
                 "CT Materials Generated" := false;
                 "CT Equipment Generated" := false;
@@ -387,6 +392,11 @@ table 60001 "Work Order Header"
         {
             DataClassification = SystemMetadata;
         }
+        field(145; "PT Update In Progress"; Boolean) { }
+        field(146; "PT Update Required"; Boolean)
+        {
+            DataClassification = SystemMetadata;
+        }
     }
     keys
     {
@@ -455,21 +465,15 @@ table 60001 "Work Order Header"
         // ensure record is committed before generation
         if ("No." = '') then
             exit;
-
+        if not IsPTReady() then
+            exit;
         RegeneratePTSetup();
 
         // force CT regeneration explicitly after setup
         if ("PEDGA Part Number" = 'PN-0446') and ("Thiocure Part Number" = 'PN-0447') then begin
-            Codeunit.Run(Codeunit::"Cure Time Materials Mgt", Rec);
-            Codeunit.Run(Codeunit::"Cure Time Equipment Mgt", Rec);
+            "PT Update Required" := true;
+            Modify(true);
         end;
-    end;
-
-    procedure UpdatePTLotNumbers()
-    var
-        Orchestrator: Codeunit "Work Order Orchestrator";
-    begin
-        Orchestrator.UpdatePTLotNumbers(Rec);
     end;
 
     local procedure RefreshPLLabels()
@@ -482,12 +486,13 @@ table 60001 "Work Order Header"
         BOMMgt: Codeunit "Work Order BOM Mgt";
         SupplyMgt: Codeunit "Operational Supply Mgt";
         EquipMgt: Codeunit "Equipment Line Mgt";
-        CTMat: Codeunit "Cure Time Materials Mgt";
+        // CTMat: Codeunit "Cure Time Materials Mgt";
         CTEq: Codeunit "Cure Time Equipment Mgt";
         PTCert: Codeunit "PT Certification Mgt";
         PTPack: Codeunit "PT Packing List Mgt";
         ProdRelMgt: Codeunit "Product Release Mgt";
         LabelMgt: Codeunit "Work Order Label Mgt";
+        WOOrchestrator: Codeunit "Work Order Orchestrator";
     begin
         if (Rec."PEDGA Part Number" = '') or
         (Rec."Thiocure Part Number" = '') then
@@ -496,19 +501,18 @@ table 60001 "Work Order Header"
         if (Rec."PEDGA Part Number" <> 'PN-0446') or
         (Rec."Thiocure Part Number" <> 'PN-0447') then
             exit;
-
         BOMMgt.ClearPTLines("No.");
         BOMMgt.GeneratePTMaterialLines(Rec);
         SupplyMgt.GenerateSupplies(Rec);
         EquipMgt.GeneratePTEquipment(Rec);
-        CTMat.GenerateCTMaterials(Rec);
+        // CTMat.GenerateCTMaterials(Rec);
         CTEq.GenerateCTEqupment(Rec);
         PTCert.GenerateTestResults(Rec);
         PTPack.GeneratePTPacking(Rec);
         ProdRelMgt.HandleRoutingChange(Rec);
         LabelMgt.RefreshLabels(Rec);
         RecalculatePT();
-        UpdatePTLotNumbers();
+        WOOrchestrator.UpdatePTLotNumbers(Rec);
         UpdateQAReleasedQty();
         UpdateLabelCalculations();
     end;
@@ -1184,5 +1188,15 @@ table 60001 "Work Order Header"
         RecalculateBELZER();
         RefreshImportantData();
         UpdateUnitReconciliation();
+    end;
+
+    procedure IsPTReady(): Boolean
+    begin
+        exit(
+            ("PEDGA Part Number" = 'PN-0446') and
+            ("Thiocure Part Number" = 'PN-0447') and
+            ("Pedga Mix Date" <> 0D) and
+            ("Thiocure Mix Date" <> 0D)
+        );
     end;
 }

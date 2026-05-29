@@ -101,7 +101,7 @@ table 60110 "Print Label Line"
             ("Labels Printed Date" <> 0D) and
             ("Retain Verified By" <> '') and
             ("Retain Verified Date" <> 0D) and
-            ("Quantity of Labels Printed" >= 0) and
+            ("Quantity of Labels Printed" > 0) and
             ("Labels Verified By" <> '') and
             ("Labels Verified Date" <> 0D) and
             ("Retain Quantity" >= 0) and

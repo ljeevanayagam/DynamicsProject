@@ -4,21 +4,28 @@ codeunit 60013 "Cure Time Materials Mgt"
     var
         LineNo: Integer;
     begin
+        DeleteTestResults(WorkOrder."No.");
+        // 🔥 HARD GUARD: prevent partial execution
+        if (WorkOrder."PEDGA Part Number" = '') or
+           (WorkOrder."Thiocure Part Number" = '') then
+            exit;
+
         if (WorkOrder."PEDGA Part Number" <> 'PN-0446') or
            (WorkOrder."Thiocure Part Number" <> 'PN-0447') then
             exit;
 
-        DeleteTestResults(WorkOrder."No.");
-
         LineNo := 1;
-        InsertCTMaterialLine(WorkOrder, LineNo,
+
+        InsertCTMaterialLine(
+            WorkOrder, LineNo,
             WorkOrder."PEDGA Part Number",
             WorkOrder."PEDGA Description",
             3, 'EA');
 
         LineNo += 1;
 
-        InsertCTMaterialLine(WorkOrder, LineNo,
+        InsertCTMaterialLine(
+            WorkOrder, LineNo,
             WorkOrder."Thiocure Part Number",
             WorkOrder."THIOCURE Description",
             3, 'EA');

@@ -27,6 +27,7 @@ table 60513 "Packing List PT Data"
         field(8; "Packaged Date"; Date) { }
         field(9; "Verified By"; Text[100]) { }
         field(10; "Verified Date"; Date) { }
+        field(11; "Component"; Enum "PT Component") { }
     }
     keys
     {

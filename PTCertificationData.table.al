@@ -49,6 +49,7 @@ table 60511 "PT Cert of Analysis Data"
         }
         field(12; "Quality Assurance"; Text[100]) { }
         field(13; Date; Date) { }
+        field(14; "Component"; Enum "PT Component") { }
     }
     keys
     {

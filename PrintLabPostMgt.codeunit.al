@@ -1,54 +1,36 @@
 codeunit 60002 "Print Label Post Mgt"
 {
-    procedure PostRun(var RunLine: Record "Print Label Line")
+    procedure PostRun(var PrintLabelLine: Record "Print Label Line")
     var
-        ItemJnlLine: Record "Item Journal Line";
-        ItemJnlPost: Codeunit "Item Jnl.-Post";
-        PrintHeader: Record "Print Label Header";
-        ItemRec: Record Item;
-        CompletedWO: Record "Completed Work Order";
-        WorkOrderHeader: Record "Work Order Header";
+        DataRec: Record "Print Label Line";
+        WorkOrderNo: Code[20];
     begin
-        RunLine.TestField(Submitted, false);
-        RunLine.TestField("Accepted Quantity");
+        WorkOrderNo := PrintLabelLine."Work Order No.";
 
-        if not PrintHeader.Get(RunLine."Work Order No.") then
-            Error('Print Label Header not found.');
+        if WorkOrderNo = '' then
+            Error('Work Order No. missing.');
 
-        ValidateLots(PrintHeader);
+        // 🔥 delete ALL existing generated lines
+        DataRec.SetRange("Work Order No.", WorkOrderNo);
+        DataRec.DeleteAll();
 
-        if not ItemRec.Get(PrintHeader."Label Part No.") then
-            Error('Item not found.');
+        // 🔥 IMPORTANT: always reload full dataset
+        PrintLabelLine.Reset();
+        PrintLabelLine.SetRange("Work Order No.", WorkOrderNo);
 
-        if not CompletedWO.Get(RunLine."Work Order No.") then
-            Error('You must post the Work Order before posting runs.');
+        if PrintLabelLine.FindSet() then
+            repeat
+                DataRec.Init();
+                DataRec."Work Order No." := PrintLabelLine."Work Order No.";
+                DataRec."Run No." := PrintLabelLine."Run No.";
 
-        // -----------------------------
-        // Journal
-        // -----------------------------
-        ItemJnlLine.Init();
-        ItemJnlLine.Validate("Journal Template Name", 'ITEM');
-        ItemJnlLine.Validate("Journal Batch Name", 'PRINTLABEL');
-        ItemJnlLine.Validate("Entry Type", ItemJnlLine."Entry Type"::"Positive Adjmt.");
-        ItemJnlLine.Validate("Item No.", ItemRec."No.");
-        ItemJnlLine.Validate("Quantity", RunLine."Accepted Quantity");
-        ItemJnlLine.Validate("Posting Date", RunLine."Labels Verified Date");
-        ItemJnlLine.Validate("Document No.", RunLine."Work Order No.");
-        ItemJnlLine.Validate("Location Code", PrintHeader."Location Code");
-        ItemJnlLine.Validate("Bin Code", PrintHeader."Bin Code");
-        ItemJnlLine.Validate("Gen. Prod. Posting Group", ItemRec."Gen. Prod. Posting Group");
-        ItemJnlLine.Validate("Inventory Posting Group", ItemRec."Inventory Posting Group");
-        ItemJnlLine.Validate("Gen. Bus. Posting Group", 'DOMESTIC');
-        ItemJnlLine.Insert(true);
+                DataRec."Quantity of Labels Printed" := PrintLabelLine."Quantity of Labels Printed";
+                DataRec."Retain Quantity" := PrintLabelLine."Retain Quantity";
+                DataRec."Rejected Quantity" := PrintLabelLine."Rejected Quantity";
+                DataRec."Accepted Quantity" := PrintLabelLine."Accepted Quantity";
 
-        ItemJnlPost.Run(ItemJnlLine);
-        EnsureCompletedWOExists(RunLine);
-        InsertCompletedRun(RunLine);
-        UpdateCompletedWorkOrderSummary(RunLine);
-        if WorkOrderHeader.Get(RunLine."Work Order No.") then
-            WorkOrderHeader.SyncHeaderStatus();
-        RunLine.Submitted := true;
-        RunLine.Modify(true);
+                DataRec.Insert();
+            until PrintLabelLine.Next() = 0;
     end;
 
     local procedure EnsureCompletedWOExists(RunLine: Record "Print Label Line")

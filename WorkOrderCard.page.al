@@ -23,17 +23,11 @@ page 60001 "Work Order Card"
                 {
                     trigger OnValidate()
                     begin
-                        CurrPage.Update(false);
                     end;
                 }
                 field("Quantity of Bags"; Rec."Quantity of Bags")
                 {
                     Editable = false;
-                    trigger OnValidate()
-                    begin
-                        Rec.RefreshImportantData();
-                        CurrPage.Update(false);
-                    end;
                 }
                 field("Unit Size (mL)"; Rec."Unit Size (mL)")
                 {
@@ -138,7 +132,15 @@ page 60001 "Work Order Card"
                     end;
                 }
                 field("P Storage Condition"; Rec."Storage Condition") { }
-                field("Pedga Mix Date"; Rec."Pedga Mix Date") { }
+                field("Pedga Mix Date"; Rec."Pedga Mix Date")
+                {
+                    trigger OnValidate()
+                    var
+                        WOOrchestrator: Codeunit "Work Order Orchestrator";
+                    begin
+                        WOOrchestrator.UpdatePTLotNumbers(Rec);
+                    end;
+                }
                 field("PEDGA Customer Lot Number"; Rec."PEDGA Customer Lot Number")
                 {
                     Caption = 'Customer Lot Number';
@@ -186,7 +188,6 @@ page 60001 "Work Order Card"
                         Actual: Decimal;
                     begin
                         Rec.ValidatePedgaWaterWeight();
-                        Rec.Modify();
                     end;
                 }
                 field("Verify PEDGA Customer"; Rec."Verify PEDGA Customer")
@@ -195,7 +196,6 @@ page 60001 "Work Order Card"
                     trigger OnValidate()
                     begin
                         Rec.ValidatePEDGACustomer();
-                        Rec.Modify()
                     end;
                 }
                 field("P Refrigeratior EQ (Optional)"; Rec."P Refrigeratior EQ (Optional)")
@@ -263,7 +263,15 @@ page 60001 "Work Order Card"
                 field("T Batch Size (Theor. Units)"; Rec."Batch Size (Theor. Units)") { Editable = false; }
                 field("Thiocure Unit Size (mL)"; Rec."Unit Size (mL)") { Editable = false; }
                 field("T Storage Condition"; Rec."Storage Condition") { Editable = false; }
-                field("Thiocure Mix Date"; Rec."Thiocure Mix Date") { }
+                field("Thiocure Mix Date"; Rec."Thiocure Mix Date")
+                {
+                    trigger OnValidate()
+                    var
+                        WOOrchestrator: Codeunit "Work Order Orchestrator";
+                    begin
+                        WOOrchestrator.UpdatePTLotNumbers(Rec);
+                    end;
+                }
                 field("THIOCURE Customer Lot Number"; Rec."THIOCURE Customer Lot Number")
                 {
                     Caption = 'Customer Lot Number';
@@ -703,8 +711,8 @@ page 60001 "Work Order Card"
                     trigger OnValidate()
                     begin
                         PrintHeader.Modify(true);
-                        Rec.Get(Rec."No.");
-                        CurrPage.Update(false);
+                        // Rec.Get(Rec."No.");
+                        // CurrPage.Update(false);
                     end;
                 }
                 field("Ribbon Part No."; PrintHeader."Ribbon Part No.") { Editable = false; }
@@ -714,8 +722,8 @@ page 60001 "Work Order Card"
                     trigger OnValidate()
                     begin
                         PrintHeader.Modify(true);
-                        Rec.Get(Rec."No.");
-                        CurrPage.Update(false);
+                        // Rec.Get(Rec."No.");
+                        // CurrPage.Update(false);
                     end;
                 }
                 field("Print Label Status"; Rec."Print Label Status") { Editable = false; }
@@ -735,6 +743,25 @@ page 60001 "Work Order Card"
     {
         area(Processing)
         {
+            action(RefreshPTDocuments)
+            {
+                Caption = 'Refresh PT Documents';
+
+                Visible =
+                    (Rec."PEDGA Part Number" = 'PN-0446') and
+                    (Rec."Thiocure Part Number" = 'PN-0447');
+
+                trigger OnAction()
+                var
+                    WOOrchestrator: Codeunit "Work Order Orchestrator";
+                begin
+                    WOOrchestrator.RunFullPTGeneration(Rec);
+
+                    CurrPage.Update(false);
+
+                    Message('PT documents refreshed successfully.');
+                end;
+            }
             action(SubmitProductRelease)
             {
                 Caption = 'Submit Product Release';
@@ -772,6 +799,7 @@ page 60001 "Work Order Card"
                     if not Rec.ArePLLabelsComplete() then
                         Error('All PL Labels must be completed before posting.');
                     LabelPostMgt.ApplyPrintLabelStatus(Rec);
+                    CurrPage.Update(false);
                 end;
             }
             action(SubmitPrintLabelWorkOrder)
@@ -874,7 +902,7 @@ page 60001 "Work Order Card"
         end
         else
             Rec."Cure Time Average Pass or Fail" := Rec."Cure Time Average Pass or Fail"::Open;
-        CurrPage.Update(false);
+        Rec.Modify(false);
     end;
 
     local procedure CureTimeSampleNot0()

@@ -11,7 +11,6 @@ page 60100 "Print Label Subpage"
             repeater(Group)
             {
                 field("Run No."; Rec."Run No.") { Editable = false; }
-
                 field("Labels Printed By"; Rec."Labels Printed By") { }
                 field("Labels Printed Date"; Rec."Labels Printed Date") { }
                 field("Retain Verified By"; Rec."Retain Verified By") { }
@@ -22,14 +21,10 @@ page 60100 "Print Label Subpage"
                 field("Rejected Quantity"; Rec."Rejected Quantity") { }
                 field("Labels Verified By"; Rec."Labels Verified By") { }
                 field("Labels Verified Date"; Rec."Labels Verified Date") { }
-                field("Submitted"; Rec.Submitted)
-                {
-                    Editable = false;
-                }
+                field("Submitted"; Rec.Submitted) { Editable = false; }
             }
         }
     }
-
     actions
     {
         area(processing)
@@ -42,11 +37,12 @@ page 60100 "Print Label Subpage"
                     PostMgt: Codeunit "Print Label Post Mgt";
                     Header: Record "Work Order Header";
                 begin
-                    Header.Get(Rec."Work Order No.");
                     if not Rec.IsComplete() then
                         Error('Enter run data before submitting.');
-                    PostMgt.PostRun(Rec);
                     Header.Get(Rec."Work Order No.");
+                    // 🔥 STEP 1: Generate printed label data FIRST
+                    PostMgt.PostRun(Rec);
+                    // 🔥 STEP 2: Only update status AFTER successful generation
                     PostMgt.ApplyPrintLabelStatus(Header);
                     CurrPage.Update(false);
                 end;

@@ -7,34 +7,50 @@ codeunit 60014 "PT Certification Mgt"
         DeleteTestResults(WorkOrder."No.");
         if (WorkOrder."PEDGA Part Number" <> 'PN-0446') or (WorkOrder."Thiocure Part Number" <> 'PN-0447') then
             exit;
-        LineNo := 1;
-        insertPTestLine(WorkOrder, LineNo, WorkOrder."PEDGA Part Number", '030264', WorkOrder."PEDGA Description", WorkOrder."PEDGA Customer Lot Number", WorkOrder."Pedga Mix Date", WorkOrder."QA Released QTY");
-        LineNo += 1;
-        insertPTestLine(WorkOrder, LineNo, WorkOrder."Thiocure Part Number", '029724', WorkOrder."THIOCURE Description", WorkOrder."THIOCURE Customer Lot Number", WorkOrder."Thiocure Mix Date", WorkOrder."QA Released QTY");
+        // HARD GUARD: system contract
+        if not WorkOrder.IsPTReady() then
+            exit;
+
+        LineNo := 10000;
+        InsertTestLine(WorkOrder, LineNo, Enum::"PT Component"::PEDGA);
+
+        LineNo += 10000;
+        InsertTestLine(WorkOrder, LineNo, Enum::"PT Component"::THIOCURE);
     end;
 
-    local procedure insertPTestLine(
+    local procedure InsertTestLine(
         WorkOrder: Record "Work Order Header";
         LineNo: Integer;
-        BCPart: Text[20];
-        CQItem: Text[100];
-        Description: Text[250];
-        CustomerLot: Code[500];
-        MixDate: Date;
-        QTY: Integer
-    )
+        Component: Enum "PT Component")
     var
         PTCert: Record "PT Cert of Analysis Data";
     begin
         PTCert.Init();
         PTCert."Work Order No." := WorkOrder."No.";
         PTCert."Line No." := LineNo;
-        PTCert."BioCure Part No." := BCPart;
-        PTCert."CQ Medical Item No." := CQItem;
-        PTCert.Description := Description;
-        PTCert."Lot Number" := CustomerLot;
-        PTCert."Mix Date" := MixDate;
-        PTCert."QTY Shipped" := QTY;
+        PTCert.Component := Component;
+
+        case Component of
+            Component::PEDGA:
+                begin
+                    PTCert."BioCure Part No." := WorkOrder."PEDGA Part Number";
+                    PTCert."CQ Medical Item No." := '030264';
+                    PTCert.Description := WorkOrder."PEDGA Description";
+                    PTCert."Lot Number" := WorkOrder."PEDGA Customer Lot Number";
+                    PTCert."Mix Date" := WorkOrder."Pedga Mix Date";
+                end;
+
+            Component::THIOCURE:
+                begin
+                    PTCert."BioCure Part No." := WorkOrder."Thiocure Part Number";
+                    PTCert."CQ Medical Item No." := '029724';
+                    PTCert.Description := WorkOrder."THIOCURE Description";
+                    PTCert."Lot Number" := WorkOrder."THIOCURE Customer Lot Number";
+                    PTCert."Mix Date" := WorkOrder."Thiocure Mix Date";
+                end;
+        end;
+
+        PTCert."QTY Shipped" := WorkOrder."QA Released QTY";
         PTCert.Insert(true);
     end;
 
@@ -43,7 +59,6 @@ codeunit 60014 "PT Certification Mgt"
         PTCert: Record "PT Cert of Analysis Data";
     begin
         PTCert.SetRange("Work Order No.", WorkOrderNo);
-        if PTCert.FindSet() then
-            PTCert.DeleteAll();
+        PTCert.DeleteAll();
     end;
 }

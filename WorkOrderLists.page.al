@@ -25,14 +25,11 @@ page 50123 "Work Orders"
                         'PRT-0492-01|PRT-0492-02|PRT-0492-03|PRT-0492-04|PRT-0492-05|PRT-0492-06|PRT-0492-07|PRT-0527|PRT-0528|PRT-0529|PRT-0530|SA-1001-01|SA-1001-02|SA-1001-03|PRT-0544-01|PRT-0544-02|PL-0002-09'));
                     trigger OnValidate()
                     var
-                        ItemRec: Record Item;
                         WO: Codeunit "Work Order Orchestrator";
                     begin
-                        if ItemRec.Get(Rec."Product Part Number") then begin
-                            Rec.Modify(true);
-                            WO.HandleRoutingChange(Rec);
-                            CurrPage.Update(false);
-                        end;
+                        WO.HandleRoutingChange(Rec);
+                        Rec.Modify(true);
+                        CurrPage.Update(false);
                     end;
                 }
                 field(Revision; Rec.Revision) { }
@@ -57,8 +54,9 @@ page 50123 "Work Orders"
                             Rec."THIOCURE Description" := ItemRec.Description;
                             Rec."THIOCURE Revision" := ItemRec."Description 2";
                         end;
+                        WO.HandleRoutingChange(Rec);
                         Rec.Modify(true);
-                        Wo.HandleRoutingChange(Rec);
+                        CurrPage.Update(false);
                     end;
                 }
                 field("PEDGA Revision"; Rec."PEDGA Revision") { Editable = false; }

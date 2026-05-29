@@ -4,42 +4,59 @@ codeunit 60015 "PT Packing List Mgt"
     var
         LineNo: Integer;
     begin
-        DeleteTestResults(WorkOrder."No.");
+        DeletePTPackingLines(WorkOrder."No.");
+        // 🔥 HARD GUARD: prevent partial PT execution
         if (WorkOrder."PEDGA Part Number" <> 'PN-0446') or (WorkOrder."Thiocure Part Number" <> 'PN-0447') then
             exit;
-        LineNo := 1;
-        insertPTestLine(WorkOrder, LineNo, WorkOrder."PEDGA Part Number", WorkOrder."PEDGA Customer Lot Number", WorkOrder."PEDGA Description", WorkOrder."QA Released QTY");
-        LineNo += 1;
-        insertPTestLine(WorkOrder, LineNo, WorkOrder."Thiocure Part Number", WorkOrder."THIOCURE Customer Lot Number", WorkOrder."THIOCURE Description", WorkOrder."QA Released QTY");
+
+        // System contract check
+        if not WorkOrder.IsPTReady() then
+            exit;
+
+        LineNo := 10000;
+        InsertPackingLine(WorkOrder, LineNo, Enum::"PT Component"::PEDGA);
+
+        LineNo += 10000;
+        InsertPackingLine(WorkOrder, LineNo, Enum::"PT Component"::THIOCURE);
     end;
 
-    local procedure insertPTestLine(
+    local procedure InsertPackingLine(
         WorkOrder: Record "Work Order Header";
         LineNo: Integer;
-        BCPart: Text[20];
-        CustomerLot: Code[250];
-        Description: Text[500];
-        Quantity: Integer
-    )
+        Component: Enum "PT Component")
     var
         PTPack: Record "Packing List PT Data";
     begin
         PTPack.Init();
         PTPack."Work Order No." := WorkOrder."No.";
         PTPack."Line No." := LineNo;
-        PTPack."Part Number" := BCPart;
-        PTPack."Customer Lot Number" := CustomerLot;
-        PTPack.Description := Description;
-        PTPack.Quantity := Quantity;
+        PTPack.Component := Component;
+
+        case Component of
+            Component::PEDGA:
+                begin
+                    PTPack."Part Number" := WorkOrder."PEDGA Part Number";
+                    PTPack."Customer Lot Number" := WorkOrder."PEDGA Customer Lot Number";
+                    PTPack.Description := WorkOrder."PEDGA Description";
+                end;
+
+            Component::THIOCURE:
+                begin
+                    PTPack."Part Number" := WorkOrder."Thiocure Part Number";
+                    PTPack."Customer Lot Number" := WorkOrder."THIOCURE Customer Lot Number";
+                    PTPack.Description := WorkOrder."THIOCURE Description";
+                end;
+        end;
+
+        PTPack.Quantity := WorkOrder."QA Released QTY";
         PTPack.Insert(true);
     end;
 
-    procedure DeleteTestResults(WorkOrderNo: Code[20])
+    procedure DeletePTPackingLines(WorkOrderNo: Code[20])
     var
-        PTCert: Record "Packing List PT Data";
+        PTPack: Record "Packing List PT Data";
     begin
-        PTCert.SetRange("Work Order No.", WorkOrderNo);
-        if PTCert.FindSet() then
-            PTCert.DeleteAll();
+        PTPack.SetRange("Work Order No.", WorkOrderNo);
+        PTPack.DeleteAll();
     end;
 }

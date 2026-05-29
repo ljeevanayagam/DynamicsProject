@@ -10,11 +10,10 @@ codeunit 60008 "Product Release Mgt"
         if WorkOrderNo = '' then
             exit;
 
-        // 🔥 ALWAYS RESET EXISTING CHECKLIST
+        // 🔥 FULL RESET (intentional design)
         ItemRec.SetRange("Work Order No.", WorkOrderNo);
         ItemRec.DeleteAll();
 
-        // Build checklist again
         ChecklistItems[1] := 'Verify all components picked show lot numbers.';
         ChecklistItems[2] := 'Ensure all items on Material Movement Ticket apply to Work Order.';
         ChecklistItems[3] := 'Ensure all Material Movement Tickets are complete, signed & dated.';
@@ -54,12 +53,8 @@ codeunit 60008 "Product Release Mgt"
     var
         ItemRec: Record "Product Release Item";
     begin
-        // Delete all checklist items for a work order (used when turning off Requires Product Release)
         ItemRec.SetRange("Work Order No.", WorkOrderNo);
-        if ItemRec.FindSet() then
-            repeat
-                ItemRec.Delete();
-            until ItemRec.Next() = 0;
+        ItemRec.DeleteAll();
     end;
 
     procedure HandleRoutingChange(var WorkOrder: Record "Work Order Header")
@@ -77,7 +72,7 @@ codeunit 60008 "Product Release Mgt"
             (WorkOrder."Routing No." = 'FILL_SET') or
             (WorkOrder."Routing No." = 'MOON-MNLT') or
             ((WorkOrder."PEDGA Part Number" = 'PN-0446') and
-            (WorkOrder."Thiocure Part Number" = 'PN-0447'))
+             (WorkOrder."Thiocure Part Number" = 'PN-0447'))
         );
     end;
 }
