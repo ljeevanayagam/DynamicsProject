@@ -7,7 +7,7 @@ codeunit 60014 "PT Certification Mgt"
         DeleteTestResults(WorkOrder."No.");
         if (WorkOrder."PEDGA Part Number" <> 'PN-0446') or (WorkOrder."Thiocure Part Number" <> 'PN-0447') then
             exit;
-        // HARD GUARD: system contract
+
         if not WorkOrder.IsPTReady() then
             exit;
 

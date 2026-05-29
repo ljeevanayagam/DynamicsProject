@@ -827,7 +827,6 @@ table 60001 "Work Order Header"
             LabelMgt.GeneratePLLabels(Rec);
         PLLabelsAlreadyGenerated := true;
         "ThiocurePLLabelsGenerated" := true;
-
     end;
 
     local procedure HasAnyPLLabels(): Boolean
